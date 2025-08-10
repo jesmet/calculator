@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Basic Calculator</title>
+<style>
+  :root{
+    --bg:#f3f6fb;
+    --panel:#ffffff;
+    --accent:#1d9bf0;
+    --btn:#e6eefb;
+    --btn-hover:#d0e7fb;
+    --dark:#222;
+    --muted:#6b7280;
+    --danger:#ff6b6b;
+    --shadow: 0 6px 18px rgba(31,41,55,0.08);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: linear-gradient(180deg, #eef5fb 0%, var(--bg) 100%);
+    color:var(--dark);
+    padding:20px;
+  }
+
+  .calc {
+    width:320px;
+    background:var(--panel);
+    border-radius:12px;
+    padding:18px;
+    box-shadow:var(--shadow);
+  }
+
+  .display {
+    background:#f7fbff;
+    border-radius:8px;
+    padding:12px 14px;
+    margin-bottom:12px;
+    text-align:right;
+    word-wrap:break-word;
+    min-height:56px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+  .display .expr {
+    color:var(--muted);
+    font-size:14px;
+    line-height:1;
+    min-height:18px;
+  }
+  .display .result {
+    font-size:24px;
+    font-weight:600;
+    margin-top:4px;
+    color:var(--dark);
+  }
+
+  .keys {
+    display:grid;
+    grid-template-columns: repeat(4,1fr);
+    gap:10px;
+  }
+
+  button.key {
+    padding:14px 10px;
+    border-radius:8px;
+    border: none;
+    background:var(--btn);
+    font-size:18px;
+    cursor:pointer;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.03) inset;
+    transition: transform .06s ease, background .12s ease;
+    user-select:none;
+  }
+  button.key:active { transform: translateY(1px) scale(.997); }
+  button.key:hover { background:var(--btn-hover); }
+
+  button.op {
+    background: linear-gradient(180deg,#dff0ff,#cfeefe);
+    color:var(--accent);
+    font-weight:700;
+  }
+  button.equal {
+    background:var(--accent);
+    color:white;
+    grid-column: span 1;
+    font-weight:700;
+    box-shadow: 0 6px 18px rgba(29,155,240,0.18);
+  }
+
+  button.wide { grid-column: span 2; }
+
+  .small {
+    font-size:14px;
+    padding:10px 8px;
+  }
+
+  .danger {
+    background:linear-gradient(180deg,#ffecec,#ffdada);
+    color:var(--danger);
+  }
+
+  footer {
+    margin-top:12px;
+    text-align:center;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  @media (max-width:360px){
+    .calc{width:100%}
+  }
+</style>
+</head>
+<body>
+  <div class="calc" role="application" aria-label="Basic calculator">
+    <div class="display" id="display" aria-live="polite">
+      <div class="expr" id="expr">&nbsp;</div>
+      <div class="result" id="result">0</div>
+    </div>
+
+    <div class="keys" id="keys">
+      <button class="key danger small" data-fn="clear" aria-label="Clear">C</button>
+      <button class="key small" data-fn="back" aria-label="Backspace">⌫</button>
+      <button class="key small op" data-value="%" aria-label="Percent">%</button>
+      <button class="key op" data-value="/" aria-label="Divide">÷</button>
+
+      <button class="key" data-value="7">7</button>
+      <button class="key" data-value="8">8</button>
+      <button class="key" data-value="9">9</button>
+      <button class="key op" data-value="*" aria-label="Multiply">×</button>
+
+      <button class="key" data-value="4">4</button>
+      <button class="key" data-value="5">5</button>
+      <button class="key" data-value="6">6</button>
+      <button class="key op" data-value="-" aria-label="Subtract">−</button>
+
+      <button class="key" data-value="1">1</button>
+      <button class="key" data-value="2">2</button>
+      <button class="key" data-value="3">3</button>
+      <button class="key op" data-value="+" aria-label="Add">+</button>
+
+      <button class="key wide" data-value="0" aria-label="Zero">0</button>
+      <button class="key" data-value="." aria-label="Decimal">.</button>
+      <button class="key equal" data-fn="equals" aria-label="Equals">=</button>
+    </div>
+
+    <footer>Keyboard: numbers, + - * /, Enter = evaluate, Backspace = erase</footer>
+  </div>
+
+<script>
+(() => {
+  const exprEl = document.getElementById('expr');
+  const resultEl = document.getElementById('result');
+  const keys = document.getElementById('keys');
+
+  let expression = '';
+  let lastWasEval = false;
+
+  function updateDisplay() {
+    exprEl.textContent = expression || '\xa0';
+    if (expression === '') resultEl.textContent = '0';
+  }
+
+  function sanitizeForEval(expr) {
+    
+    return expr;
+  }
+
+  function safeEval(expr) {
+    if (!/^[0-9+\-*/%.()\s]+$/.test(expr)) {
+      throw new Error('Invalid characters in expression.');
+    }
+    
+    return Function('"use strict"; return (' + expr + ')')();
+  }
+
+  function appendValue(val) {
+    if (lastWasEval && /[0-9.]/.test(val)) {
+      expression = '';
+    }
+    lastWasEval = false;
+
+    const lastChar = expression.slice(-1);
+    if (val === '.') {
+      const match = expression.match(/(\d*\.\d*|\d+)$/);
+      if (match && match[0].includes('.')) return;
+      if (!/\d$/.test(lastChar)) expression += '0';
+      expression += '.';
+      updateDisplay();
+      return;
+    }
+
+    if (/[+\-*/%]/.test(val)) {
+      if (expression === '' && val !== '-') return;
+      if (/[+\-*/%]$/.test(lastChar)) {
+        expression = expression.slice(0, -1) + val;
+      } else {
+        expression += val;
+      }
+      updateDisplay();
+      return;
+    }
+
+    expression += val;
+    updateDisplay();
+  }
+
+  function doBackspace() {
+    if (lastWasEval) {
+      expression = '';
+      lastWasEval = false;
+      updateDisplay();
+      return;
+    }
+    expression = expression.slice(0, -1);
+    updateDisplay();
+  }
+
+  function doClear() {
+  expression = '';
+  lastWasEval = false;
+  updateDisplay();
+  }
+
+  function doEvaluate() {
+    if (!expression) {
+      resultEl.textContent = '0';
+      return;
+    }
+    try {
+      const sanitized = sanitizeForEval(expression);
+      const value = safeEval(sanitized);
+      if (!isFinite(value)) throw new Error('Result is not finite');
+      const formatted = Number.isInteger(value) ? String(value) : (+value.toFixed(8)).toString();
+      resultEl.textContent = formatted;
+      lastWasEval = true;
+      expression = formatted;
+    } catch (err) {
+      resultEl.textContent = 'Error';
+      console.error('Evaluation error:', err);
+      lastWasEval = true;
+    }
+  }
+
+  // Click handlers
+  keys.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const v = btn.getAttribute('data-value');
+    const fn = btn.getAttribute('data-fn');
+    if (fn) {
+      if (fn === 'clear') doClear();
+      else if (fn === 'back') doBackspace();
+      else if (fn === 'equals') doEvaluate();
+      return;
+    }
+    if (v) appendValue(v);
+  });
+
+  // Keyboard support
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === '=') {
+      e.preventDefault();
+      doEvaluate();
+      return;
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      doBackspace();
+      return;
+    }
+    if (e.key === 'Escape' || e.key.toLowerCase() === 'c') {
+      // Esc or 'c' clears
+      doClear();
+      return;
+    }
+    // Allow digits and operators
+    if (/^[0-9+\-*/.%()]$/.test(e.key)) {
+      e.preventDefault();
+      appendValue(e.key);
+      return;
+    }
+    if (e.key === '.') {
+      e.preventDefault();
+      appendValue('.');
+      return;
+    }
+  });
+
+  // init
+  updateDisplay();
+})();
+</script>
+</body>
+</html>
